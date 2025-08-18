@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ref, set, serverTimestamp } from "firebase/database";
 import { rtdb } from "../firebase/config";
 import { Lock, Wifi, WifiOff } from "lucide-react";
@@ -8,14 +8,6 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    // check localStorage
-    const savedUser = localStorage.getItem("chatUser");
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-  }, [setCurrentUser]);
-
   const handleLogin = () => {
     const validUsers = {
       Rishabh: "1234",
@@ -23,11 +15,15 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
     };
 
     if (validUsers[name] === passcode) {
-      const user = { name, id: name };
-      setCurrentUser(user);
-      localStorage.setItem("chatUser", JSON.stringify(user)); // ✅ save to localStorage
+      const userObj = { name, id: name };
+      setCurrentUser(userObj);
+
+      // ✅ Save in LocalStorage
+      localStorage.setItem("chatUser", JSON.stringify(userObj));
+
       setError("");
 
+      // Firebase user update
       const userRef = ref(rtdb, `users/${name}`);
       set(userRef, {
         name,
@@ -40,17 +36,19 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black flex items-center justify-center p-4">
-      <div className="bg-gray-900 rounded-3xl shadow-2xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md border border-gray-700">
+    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md">
         <div className="text-center mb-6">
-          <div className="bg-gray-800 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
-            <Lock className="text-purple-400" size={20} />
+          <div className="bg-purple-100 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
+            <Lock className="text-purple-600" size={20} />
           </div>
-          <h1 className="text-xl font-bold text-white mb-2">CHAT APP</h1>
-          <p className="text-sm text-gray-400">Enter your credentials to access</p>
+          <h1 className="text-xl font-bold text-gray-800 mb-2">CHAT APP</h1>
+          <p className="text-sm text-gray-600">
+            Enter your credentials to access
+          </p>
           <div
             className={`flex items-center justify-center mt-2 text-xs ${
-              isOnline ? "text-green-400" : "text-red-400"
+              isOnline ? "text-green-600" : "text-red-600"
             }`}
           >
             {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
@@ -64,7 +62,7 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Username"
-            className="w-full px-4 py-2 rounded-xl border border-gray-700 bg-gray-800 text-white placeholder-gray-500"
+            className="w-full px-4 py-2 rounded-xl border"
           />
           <input
             type="password"
@@ -72,13 +70,13 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
             onChange={(e) => setPasscode(e.target.value)}
             placeholder="Passcode"
             onKeyPress={(e) => e.key === "Enter" && handleLogin()}
-            className="w-full px-4 py-2 rounded-xl border border-gray-700 bg-gray-800 text-white placeholder-gray-500"
+            className="w-full px-4 py-2 rounded-xl border"
           />
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-500 text-sm">{error}</p>}
           <button
             onClick={handleLogin}
             disabled={!isOnline}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-xl transition"
+            className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-xl"
           >
             {isOnline ? "Login" : "No Internet"}
           </button>
