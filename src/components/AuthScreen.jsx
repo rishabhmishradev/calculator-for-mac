@@ -10,8 +10,8 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
 
   const handleLogin = () => {
     const validUsers = {
-      user1: "1234",
-      user2: "5678",
+      Rishabh: "1234",
+      Saman: "chudail",
     };
 
     if (validUsers[name] === passcode) {
@@ -25,7 +25,7 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
         isOnline: true,
       });
     } else {
-      setError("Invalid credentials. Use user1/1234 or user2/5678");
+      setError("Invalid credentials.");
     }
   };
 
