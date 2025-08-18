@@ -10,6 +10,12 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
+  // 👇 Mount pe ekdum niche scroll (without animation)
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+  }, []);
+
+  // 👇 New messages aane par smooth scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -17,18 +23,16 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
   // Handle typing indicator
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
-    
+
     if (e.target.value.trim()) {
       if (!isTyping) {
         setIsTyping(true);
       }
-      
-      // Clear existing timeout
+
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-      
-      // Set new timeout to stop typing indicator
+
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
       }, 1500);
@@ -43,12 +47,11 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const sendMessage = async () => {
     if (newMessage.trim() && currentUser && isOnline) {
       try {
-        // Stop typing indicator immediately when sending
         setIsTyping(false);
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
         }
-        
+
         const messagesRef = ref(rtdb, "messages");
         await push(messagesRef, {
           text: newMessage,
@@ -68,16 +71,15 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     const newText = newMessage + emoji;
     setNewMessage(newText);
     setShowEmojiPicker(false);
-    
-    // Trigger typing indicator for emoji
+
     if (!isTyping) {
       setIsTyping(true);
     }
-    
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    
+
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
     }, 1500);
@@ -121,24 +123,17 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
                         : "bg-gradient-to-r from-zinc-800 to-zinc-700 text-white border border-zinc-600"
                     }`}
                   >
-                    {/* Sender name for others */}
                     {message.sender !== currentUser?.name && (
                       <p className="text-xs font-semibold text-amber-400 mb-2 tracking-wide">
                         {message.sender}
                       </p>
                     )}
-                    
-                    {/* Message text */}
-                    <p className="text-sm leading-relaxed mb-2">
-                      {message.text}
-                    </p>
-                    
-                    {/* Timestamp */}
-                    <p className={`text-xs opacity-70 ${
-                      message.sender === currentUser?.name
-                        ? "text-black"
-                        : "text-zinc-400"
-                    }`}>
+                    <p className="text-sm leading-relaxed mb-2">{message.text}</p>
+                    <p
+                      className={`text-xs opacity-70 ${
+                        message.sender === currentUser?.name ? "text-black" : "text-zinc-400"
+                      }`}
+                    >
                       {message.createdAt
                         ? new Date(message.createdAt).toLocaleTimeString([], {
                             hour: "2-digit",
@@ -150,8 +145,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
                 </div>
               </div>
             ))}
-            
-            {/* Typing Indicator */}
+
             {isTyping && (
               <div className="flex justify-start">
                 <div className="max-w-xs sm:max-w-sm lg:max-w-md">
@@ -160,8 +154,14 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
                       <span className="text-xs text-amber-400 font-semibold">You are typing</span>
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                        <div
+                          className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.1s" }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"
+                          style={{ animationDelay: "0.2s" }}
+                        ></div>
                       </div>
                     </div>
                   </div>
@@ -175,7 +175,6 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
 
       {/* Input Section */}
       <div className="p-4 bg-zinc-900">
-        {/* Emoji Picker */}
         {showEmojiPicker && (
           <div className="mb-4 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
             <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
@@ -192,9 +191,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
           </div>
         )}
 
-        {/* Input Bar */}
         <div className="flex items-center space-x-3">
-          {/* Emoji Button */}
           <button
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
             className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
@@ -203,7 +200,6 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
             <Smile className="w-5 h-5 text-amber-400" />
           </button>
 
-          {/* Message Input */}
           <div className="flex-1 relative">
             <input
               type="text"
@@ -214,7 +210,6 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
               disabled={!isOnline}
               className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all disabled:opacity-50"
             />
-            {/* Typing Indicator Dot */}
             {newMessage && (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                 <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
@@ -222,7 +217,6 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
             )}
           </div>
 
-          {/* Send Button */}
           <button
             onClick={sendMessage}
             disabled={!isOnline || !newMessage.trim()}
@@ -232,7 +226,6 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
           </button>
         </div>
 
-        {/* Connection Status */}
         {isOnline && (
           <div className="flex items-center justify-center mt-3">
             <div className="flex items-center space-x-2 text-xs text-zinc-500">
