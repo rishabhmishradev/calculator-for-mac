@@ -24,6 +24,14 @@ const App = () => {
     },
   });
 
+  // ✅ Load user from localStorage on app load
+  useEffect(() => {
+    const savedUser = localStorage.getItem("chatUser");
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+    }
+  }, []);
+
   // Online/Offline Status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -82,40 +90,38 @@ const App = () => {
     }
   };
 
+  // ✅ Logout function
+  const handleLogout = () => {
+    localStorage.removeItem("chatUser");
+    setCurrentUser(null);
+  };
+
   if (!currentUser) {
     return <AuthScreen setCurrentUser={setCurrentUser} isOnline={isOnline} />;
   }
 
   return (
-  <div className="h-screen w-screen bg-gray-950 flex flex-col overflow-hidden">
-    <Navigation
-      currentUser={currentUser}
-      setCurrentUser={setCurrentUser}
-      setActiveSection={setActiveSection}
-      activeSection={activeSection}
-      isOnline={isOnline}
-    />
+    <div className="h-screen w-screen bg-gray-950 flex flex-col overflow-hidden">
+      <Navigation
+        currentUser={currentUser}
+        setCurrentUser={setCurrentUser}
+        setActiveSection={setActiveSection}
+        activeSection={activeSection}
+        isOnline={isOnline}
+        onLogout={handleLogout} // ✅ pass logout
+      />
 
-    <main className="flex-1 flex flex-col overflow-hidden">
-      {activeSection === "chat" && (
-        <ChatRoom
-          currentUser={currentUser}
-          isOnline={isOnline}
-          messages={messages}
-        />
-      )}
-      {activeSection === "games" && (
-        <GamesSection
-          gameStates={gameStates}
-          updateGameState={updateGameState}
-          isOnline={isOnline}
-        />
-      )}
-      {activeSection === "creative" && <CreativeZone />}
-    </main>
-  </div>
-);
-
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {activeSection === "chat" && (
+          <ChatRoom currentUser={currentUser} isOnline={isOnline} messages={messages} />
+        )}
+        {activeSection === "games" && (
+          <GamesSection gameStates={gameStates} updateGameState={updateGameState} isOnline={isOnline} />
+        )}
+        {activeSection === "creative" && <CreativeZone />}
+      </main>
+    </div>
+  );
 };
 
 export default App;
