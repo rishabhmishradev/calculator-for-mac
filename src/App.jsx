@@ -24,7 +24,7 @@ const App = () => {
     },
   });
 
-  // ✅ Load user from localStorage on app load
+  // ✅ Load user from localStorage
   useEffect(() => {
     const savedUser = localStorage.getItem("chatUser");
     if (savedUser) {
@@ -32,7 +32,7 @@ const App = () => {
     }
   }, []);
 
-  // Online/Offline Status
+  // ✅ Online/Offline Status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -46,7 +46,7 @@ const App = () => {
     };
   }, []);
 
-  // Real-time Messages Listener
+  // ✅ Real-time Messages Listener
   useEffect(() => {
     if (!currentUser) return;
 
@@ -59,7 +59,9 @@ const App = () => {
           ...value,
         }));
         setMessages(
-          messagesList.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+          messagesList.sort(
+            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
+          )
         );
       }
     });
@@ -67,7 +69,7 @@ const App = () => {
     return () => unsubscribe();
   }, [currentUser]);
 
-  // Real-time Game State Sync
+  // ✅ Real-time Game State Sync
   useEffect(() => {
     if (!currentUser) return;
 
@@ -90,12 +92,7 @@ const App = () => {
     }
   };
 
-  // ✅ Logout function
-  const handleLogout = () => {
-    localStorage.removeItem("chatUser");
-    setCurrentUser(null);
-  };
-
+  // ✅ If not logged in → show AuthScreen
   if (!currentUser) {
     return <AuthScreen setCurrentUser={setCurrentUser} isOnline={isOnline} />;
   }
@@ -108,15 +105,22 @@ const App = () => {
         setActiveSection={setActiveSection}
         activeSection={activeSection}
         isOnline={isOnline}
-        onLogout={handleLogout} // ✅ pass logout
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
         {activeSection === "chat" && (
-          <ChatRoom currentUser={currentUser} isOnline={isOnline} messages={messages} />
+          <ChatRoom
+            currentUser={currentUser}
+            isOnline={isOnline}
+            messages={messages}
+          />
         )}
         {activeSection === "games" && (
-          <GamesSection gameStates={gameStates} updateGameState={updateGameState} isOnline={isOnline} />
+          <GamesSection
+            gameStates={gameStates}
+            updateGameState={updateGameState}
+            isOnline={isOnline}
+          />
         )}
         {activeSection === "creative" && <CreativeZone />}
       </main>
