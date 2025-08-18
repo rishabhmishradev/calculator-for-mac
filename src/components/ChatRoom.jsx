@@ -1,19 +1,54 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ref, push, serverTimestamp } from "firebase/database";
 import { rtdb } from "../firebase/config";
-import { Send, MessageCircle, Wifi, WifiOff } from "lucide-react";
+import { Send, MessageCircle, Smile } from "lucide-react";
 
 const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const [newMessage, setNewMessage] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Handle typing indicator
+  const handleInputChange = (e) => {
+    setNewMessage(e.target.value);
+    
+    if (e.target.value.trim()) {
+      if (!isTyping) {
+        setIsTyping(true);
+      }
+      
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Set new timeout to stop typing indicator
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+      }, 1500);
+    } else {
+      setIsTyping(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    }
+  };
+
   const sendMessage = async () => {
     if (newMessage.trim() && currentUser && isOnline) {
       try {
+        // Stop typing indicator immediately when sending
+        setIsTyping(false);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        
         const messagesRef = ref(rtdb, "messages");
         await push(messagesRef, {
           text: newMessage,
@@ -22,6 +57,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
           createdAt: new Date().toISOString(),
         });
         setNewMessage("");
+        setShowEmojiPicker(false);
       } catch (error) {
         console.error("Error sending message:", error);
       }
@@ -29,135 +65,182 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
   };
 
   const addEmoji = (emoji) => {
-    setNewMessage(newMessage + emoji);
+    const newText = newMessage + emoji;
+    setNewMessage(newText);
+    setShowEmojiPicker(false);
+    
+    // Trigger typing indicator for emoji
+    if (!isTyping) {
+      setIsTyping(true);
+    }
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+    }, 1500);
   };
 
+  // Cleanup timeout on component unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
+
   return (
-    <div className="flex flex-col flex-1 w-full bg-gray-900 overflow-hidden">
-
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-3 sm:p-4">
-        <div className="flex">
-          <div>
-            <h2 className="text-lg sm:text-xl font-bold mb-1">Chat App 💬</h2>
-            <p className="text-purple-100 text-xs sm:text-sm">Start Messaging</p>
-          </div>
-          <div
-            className={`flex items-center space-x-1 text-xs sm:text-sm ${
-              isOnline ? "text-green-200" : "text-red-200"
-            }`}
-          >
-            {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-            <span className="hidden sm:inline">
-              {isOnline ? "Connected" : "Offline"}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 bg-gradient-to-b from-gray-50 to-white">
+    <div className="flex flex-col h-screen bg-black">
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-zinc-900 to-black">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8 sm:mt-16">
-            <MessageCircle
-              size={48}
-              className="sm:w-16 sm:h-16 mx-auto mb-3 opacity-30"
-            />
-            <p className="text-base sm:text-lg mb-2">No messages yet</p>
-            <p className="text-xs sm:text-sm">Start the conversation! 🚀</p>
+          <div className="text-center text-zinc-400 mt-32">
+            <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
+            <h3 className="text-xl font-semibold mb-2 text-zinc-300">No messages yet</h3>
+            <p className="text-zinc-500">Start the conversation ✨</p>
           </div>
         ) : (
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-4">
             {messages.map((message) => (
               <div
                 key={message.id}
                 className={`flex ${
-                  message.sender === currentUser.name
-                    ? "justify-end"
-                    : "justify-start"
+                  message.sender === currentUser?.name ? "justify-end" : "justify-start"
                 }`}
               >
-                <div
-                  className={`max-w-xs sm:max-w-sm px-3 py-2 sm:px-4 sm:py-3 rounded-2xl shadow-sm ${
-                    message.sender === currentUser.name
-                      ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
-                      : "bg-white text-gray-800 border border-gray-100"
-                  }`}
-                >
-                  <div className="flex items-center space-x-2 mb-1">
-                    <p
-                      className={`text-xs font-medium ${
-                        message.sender === currentUser.name
-                          ? "text-purple-200"
-                          : "text-purple-600"
-                      }`}
-                    >
-                      {message.sender}
-                    </p>
-                  </div>
-                  <p className="text-xs sm:text-sm leading-relaxed">
-                    {message.text}
-                  </p>
-                  <p
-                    className={`text-xs mt-1 ${
-                      message.sender === currentUser.name
-                        ? "text-purple-200"
-                        : "text-gray-500"
+                <div className="max-w-xs sm:max-w-sm lg:max-w-md">
+                  <div
+                    className={`px-4 py-3 rounded-2xl shadow-lg ${
+                      message.sender === currentUser?.name
+                        ? "bg-gradient-to-r from-amber-500 to-yellow-600 text-black"
+                        : "bg-gradient-to-r from-zinc-800 to-zinc-700 text-white border border-zinc-600"
                     }`}
                   >
-                    {message.createdAt
-                      ? new Date(message.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                      : "Sending..."}
-                  </p>
+                    {/* Sender name for others */}
+                    {message.sender !== currentUser?.name && (
+                      <p className="text-xs font-semibold text-amber-400 mb-2 tracking-wide">
+                        {message.sender}
+                      </p>
+                    )}
+                    
+                    {/* Message text */}
+                    <p className="text-sm leading-relaxed mb-2">
+                      {message.text}
+                    </p>
+                    
+                    {/* Timestamp */}
+                    <p className={`text-xs opacity-70 ${
+                      message.sender === currentUser?.name
+                        ? "text-black"
+                        : "text-zinc-400"
+                    }`}>
+                      {message.createdAt
+                        ? new Date(message.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : "Sending..."}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
+            
+            {/* Typing Indicator */}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="max-w-xs sm:max-w-sm lg:max-w-md">
+                  <div className="px-4 py-3 bg-gradient-to-r from-zinc-800 to-zinc-700 text-white border border-zinc-600 rounded-2xl shadow-lg">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-amber-400 font-semibold">You are typing</span>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-     <div className="p-2 sm:p-4 bg-white border-t border-gray-100">
-        {/* Emoji Bar */}
-        <div className="flex space-x-1 sm:space-x-2 mb-2 overflow-x-auto scrollbar-hide">
-          {["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"].map(
-            (emoji) => (
-              <button
-                key={emoji}
-                onClick={() => addEmoji(emoji)}
-                className="text-base sm:text-xl hover:bg-gray-100 rounded-lg p-1 sm:p-2 flex-shrink-0 transition-colors"
-              >
-                {emoji}
-              </button>
-            )
-          )}
-        </div>
+      {/* Input Section */}
+      <div className="p-4 bg-zinc-900">
+        {/* Emoji Picker */}
+        {showEmojiPicker && (
+          <div className="mb-4 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+              {emojiList.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => addEmoji(emoji)}
+                  className="text-xl p-2 hover:bg-zinc-700 rounded-lg transition-colors hover:scale-110 transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-        {/* Input & Send */}
-        <div className="flex space-x-2 sm:space-x-3">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-            placeholder={
-              isOnline ? "Type your message... " : "No internet connection"
-            }
+        {/* Input Bar */}
+        <div className="flex items-center space-x-3">
+          {/* Emoji Button */}
+          <button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
             disabled={!isOnline}
-            className="flex-1 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100"
-          />
+          >
+            <Smile className="w-5 h-5 text-amber-400" />
+          </button>
+
+          {/* Message Input */}
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={handleInputChange}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              placeholder={isOnline ? "Type a message..." : "No connection"}
+              disabled={!isOnline}
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all disabled:opacity-50"
+            />
+            {/* Typing Indicator Dot */}
+            {newMessage && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Send Button */}
           <button
             onClick={sendMessage}
             disabled={!isOnline || !newMessage.trim()}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-300 disabled:to-gray-400 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-xl transition-all shadow-lg"
+            className="p-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 disabled:from-zinc-700 disabled:to-zinc-600 text-black rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed"
           >
-            <Send size={16} />
+            <Send className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Connection Status */}
+        {isOnline && (
+          <div className="flex items-center justify-center mt-3">
+            <div className="flex items-center space-x-2 text-xs text-zinc-500">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <span>Connected</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
