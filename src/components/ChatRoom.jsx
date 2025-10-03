@@ -180,30 +180,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
               </div>
             ))}
 
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="max-w-xs sm:max-w-sm lg:max-w-md">
-                  <div className="px-4 py-3 bg-gradient-to-r from-zinc-800 to-zinc-700 text-white border border-zinc-600 rounded-2xl shadow-lg">
-                    <div className="flex items-center space-x-1">
-                      <span className="text-xs text-amber-400 font-semibold">You are typing</span>
-                      <div className="flex space-x-1">
-                        <div className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"></div>
-                        <div
-                          className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.1s" }}
-                        ></div>
-                        <div
-                          className="w-2 h-2 bg-amber-400 rounded-full animate-bounce"
-                          style={{ animationDelay: "0.2s" }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+            
         {/* 👇 Invisible div for scrolling reference */}
         <div ref={messagesEndRef} />
       </div>
