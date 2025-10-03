@@ -6,9 +6,7 @@ import { Send, MessageCircle, Smile } from "lucide-react";
 const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const [newMessage, setNewMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
   // 👇 Function to scroll to bottom
@@ -16,61 +14,30 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior });
     }
-    // Alternative method - scroll container to bottom
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   };
 
-  // 👇 Always keep user at bottom - no matter what
+  // 👇 Always keep user at bottom
   useEffect(() => {
     scrollToBottom("auto");
-  }, []); // Initial mount
+  }, []);
 
   useEffect(() => {
-    scrollToBottom("auto"); // Instant scroll for all message updates
-  }, [messages]); // Every time messages change
+    scrollToBottom("auto");
+  }, [messages]);
 
-  // 👇 Force bottom position on any container change
   useEffect(() => {
     if (messagesContainerRef.current) {
       const container = messagesContainerRef.current;
       container.scrollTop = container.scrollHeight;
     }
-  }, [messages, isTyping]); // Also when typing indicator appears/disappears
-
-  // Handle typing indicator
-  const handleInputChange = (e) => {
-    setNewMessage(e.target.value);
-
-    if (e.target.value.trim()) {
-      if (!isTyping) {
-        setIsTyping(true);
-      }
-
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      typingTimeoutRef.current = setTimeout(() => {
-        setIsTyping(false);
-      }, 1500);
-    } else {
-      setIsTyping(false);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    }
-  };
+  }, [messages]);
 
   const sendMessage = async () => {
     if (newMessage.trim() && currentUser && isOnline) {
       try {
-        setIsTyping(false);
-        if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current);
-        }
-
         const messagesRef = ref(rtdb, "messages");
         await push(messagesRef, {
           text: newMessage,
@@ -81,7 +48,6 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
         setNewMessage("");
         setShowEmojiPicker(false);
         
-        // 👇 Immediately force scroll to bottom after sending
         setTimeout(() => {
           scrollToBottom("auto");
           if (messagesContainerRef.current) {
@@ -95,31 +61,9 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
   };
 
   const addEmoji = (emoji) => {
-    const newText = newMessage + emoji;
-    setNewMessage(newText);
+    setNewMessage(newMessage + emoji);
     setShowEmojiPicker(false);
-
-    if (!isTyping) {
-      setIsTyping(true);
-    }
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-    }, 1500);
   };
-
-  // Cleanup timeout on component unmount
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
 
@@ -130,8 +74,8 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-zinc-900 to-black"
         style={{ 
-          scrollBehavior: 'auto', // Changed to auto for instant scrolling
-          overflowAnchor: 'none' // Prevents automatic scroll adjustment
+          scrollBehavior: 'auto',
+          overflowAnchor: 'none'
         }}
       >
         {messages.length === 0 ? (
@@ -179,9 +123,8 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
                 </div>
               </div>
             ))}
-
-            
-        {/* 👇 Invisible div for scrolling reference */}
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -216,7 +159,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
             <input
               type="text"
               value={newMessage}
-              onChange={handleInputChange}
+              onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder={isOnline ? "Type a message..." : "No connection"}
               disabled={!isOnline}
