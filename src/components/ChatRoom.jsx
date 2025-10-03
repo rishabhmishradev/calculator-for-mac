@@ -104,7 +104,7 @@ const ReadReceipt = ({ status }) => {
   if (status === "read") {
     return (
       <div className="flex items-center space-x-1">
-        <CheckCheck className={`${baseClasses} text-darkblue-400`} />
+        <CheckCheck className={`${baseClasses} text-green-400`} />
       </div>
     );
   }
