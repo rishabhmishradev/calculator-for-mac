@@ -98,25 +98,27 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
 
   const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
 
-  // Read Receipt Icon Component
-  const ReadReceipt = ({ status }) => {
-    if (status === "read") {
-      return (
-        <div className="flex items-center space-x-0.5">
-          <CheckCheck className="w-3 h-3 text-blue-400" />
-        </div>
-      );
-    }
-    if (status === "delivered") {
-      return (
-        <div className="flex items-center space-x-0.5">
-          <CheckCheck className="w-3 h-3" />
-        </div>
-      );
-    }
-    // sent
-    return <Check className="w-3 h-3" />;
-  };
+ // Read Receipt Icon Component
+const ReadReceipt = ({ status }) => {
+  const baseClasses = "w-5 h-5"; // Make it bigger
+  if (status === "read") {
+    return (
+      <div className="flex items-center space-x-1">
+        <CheckCheck className={`${baseClasses} text-blue-400`} />
+      </div>
+    );
+  }
+  if (status === "delivered") {
+    return (
+      <div className="flex items-center space-x-1">
+        <CheckCheck className={`${baseClasses} text-zinc-400`} />
+      </div>
+    );
+  }
+  // sent
+  return <Check className={`${baseClasses} text-zinc-400`} />;
+};
+
 
   return (
     <div className="flex flex-col h-screen bg-black">
