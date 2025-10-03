@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ref, push, serverTimestamp, update } from "firebase/database";
+import { ref, push, serverTimestamp, update, onValue } from "firebase/database";
 import { rtdb } from "../firebase/config";
 import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
-import { useNotifications } from "../hooks/useNotifications";
 
 const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const [newMessage, setNewMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const prevMessagesLengthRef = useRef(messages.length);
-
-  // Initialize notifications
-  const { showNotification } = useNotifications(currentUser);
 
   const scrollToBottom = (behavior = "auto") => {
     if (messagesEndRef.current) {
@@ -27,30 +22,16 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     scrollToBottom("auto");
   }, []);
 
-  // Show notification for new messages
   useEffect(() => {
-    if (messages.length > prevMessagesLengthRef.current) {
-      const lastMessage = messages[messages.length - 1];
-      
-      // Show notification if message is from someone else
-      if (lastMessage && lastMessage.sender !== currentUser?.name) {
-        showNotification(
-          `New message from ${lastMessage.sender}`,
-          lastMessage.text,
-          lastMessage.sender
-        );
-      }
-    }
-    
-    prevMessagesLengthRef.current = messages.length;
     scrollToBottom("auto");
-  }, [messages, currentUser, showNotification]);
+  }, [messages]);
 
-  // Mark messages as read
+  // Mark messages as read when they come into view
   useEffect(() => {
     if (!currentUser || !messages.length) return;
 
     messages.forEach((message) => {
+      // Only mark others' messages as read
       if (message.sender !== currentUser.name && message.status !== "read") {
         const messageRef = ref(rtdb, `messages/${message.id}`);
         update(messageRef, {
@@ -70,7 +51,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
           sender: currentUser.name,
           timestamp: serverTimestamp(),
           createdAt: new Date().toISOString(),
-          status: "sent",
+          status: "sent", // Initial status
         });
         setNewMessage("");
         setShowEmojiPicker(false);
@@ -87,7 +68,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     }
   };
 
-  // Update delivery status
+  // Simulate delivery status after 1 second
   useEffect(() => {
     if (!currentUser) return;
 
@@ -115,26 +96,29 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     setShowEmojiPicker(false);
   };
 
-  const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😎", "🥳"];
+  const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
 
-  const ReadReceipt = ({ status }) => {
-    const baseClasses = "w-5 h-5";
-    if (status === "read") {
-      return (
-        <div className="flex items-center space-x-1">
-          <CheckCheck className={`${baseClasses} text-green-400`} />
-        </div>
-      );
-    }
-    if (status === "delivered") {
-      return (
-        <div className="flex items-center space-x-1">
-          <CheckCheck className={`${baseClasses} text-zinc-400`} />
-        </div>
-      );
-    }
-    return <Check className={`${baseClasses} text-zinc-400`} />;
-  };
+ // Read Receipt Icon Component
+const ReadReceipt = ({ status }) => {
+  const baseClasses = "w-5 h-5"; // Make it bigger
+  if (status === "read") {
+    return (
+      <div className="flex items-center space-x-1">
+        <CheckCheck className={`${baseClasses} text-green-400`} />
+      </div>
+    );
+  }
+  if (status === "delivered") {
+    return (
+      <div className="flex items-center space-x-1">
+        <CheckCheck className={`${baseClasses} text-zinc-400`} />
+      </div>
+    );
+  }
+  // sent
+  return <Check className={`${baseClasses} text-zinc-400`} />;
+};
+
 
   return (
     <div className="flex flex-col h-screen bg-black">
@@ -199,6 +183,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
                             )
                           : "Sending..."}
                       </p>
+                      {/* Show read receipt only for sender's messages */}
                       {message.sender === currentUser?.name && (
                         <div className="ml-2">
                           <ReadReceipt status={message.status || "sent"} />
