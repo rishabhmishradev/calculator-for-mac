@@ -1,10 +1,20 @@
 import React, { useState } from "react";
 import { LogOut, MessageCircle, Gamepad2, Palette, Menu, X } from "lucide-react";
+import { ref, set, serverTimestamp } from "firebase/database";
+import { rtdb } from "../firebase/config";
 
-const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSection }) => {
+const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSection, userPresence }) => {
   const [open, setOpen] = useState(false);
 
   const handleLogout = () => {
+    if (currentUser?.name) {
+      const userRef = ref(rtdb, `users/${currentUser.name}`);
+      set(userRef, {
+        name: currentUser.name,
+        isOnline: false,
+        lastSeen: serverTimestamp(),
+      });
+    }
     localStorage.removeItem("chatUser");
     setCurrentUser(null);
     setActiveSection("chat");
@@ -54,9 +64,16 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
 
           {/* Right: User + Logout (desktop) */}
           <div className="hidden md:flex items-center gap-5">
-            <span className="text-sm font-medium text-gray-200 bg-gray-800 px-4 py-1.5 rounded-full shadow">
-              {currentUser?.name}
-            </span>
+            <div className="flex items-center gap-3 bg-gray-800 px-4 py-1.5 rounded-full shadow">
+              <span className="text-sm font-medium text-gray-200">{currentUser?.name}</span>
+              <span className="text-xs text-gray-400">
+                {userPresence?.isOnline
+                  ? "Online"
+                  : userPresence?.lastSeen
+                  ? `Last seen ${new Date(userPresence.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                  : "Offline"}
+              </span>
+            </div>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-5 py-2 rounded-full text-sm font-medium shadow-md transition-all"
@@ -92,9 +109,16 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
             <div className="mt-4 h-px bg-gray-800" />
 
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-200 bg-gray-800 px-3 py-1.5 rounded-full">
-                {currentUser?.name}
-              </span>
+              <div className="flex items-center gap-2 bg-gray-800 px-3 py-1.5 rounded-full">
+                <span className="text-sm font-medium text-gray-200">{currentUser?.name}</span>
+                <span className="text-xs text-gray-400">
+                  {userPresence?.isOnline
+                    ? "Online"
+                    : userPresence?.lastSeen
+                    ? `Last seen ${new Date(userPresence.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                    : "Offline"}
+                </span>
+              </div>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-xl text-sm font-medium shadow-md transition-all"
