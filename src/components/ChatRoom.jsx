@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ref, push, serverTimestamp } from "firebase/database";
+import { ref, push, serverTimestamp, update, onValue } from "firebase/database";
 import { rtdb } from "../firebase/config";
-import { Send, MessageCircle, Smile } from "lucide-react";
-import { markMessageAsRead } from "../utils/messageActions";
+import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
 
 const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const [newMessage, setNewMessage] = useState("");
@@ -27,21 +26,18 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     scrollToBottom("auto");
   }, [messages]);
 
+  // Mark messages as read when they come into view
   useEffect(() => {
-    if (messagesContainerRef.current) {
-      const container = messagesContainerRef.current;
-      container.scrollTop = container.scrollHeight;
-    }
-  }, [messages]);
-
-  // NEW: Auto-mark messages as read
-  useEffect(() => {
-    if (!currentUser || messages.length === 0) return;
+    if (!currentUser || !messages.length) return;
 
     messages.forEach((message) => {
-      // Sirf dusre ke messages ko read mark karo
-      if (message.sender !== currentUser.name && !message.readBy?.[currentUser.name]) {
-        markMessageAsRead(message.id, currentUser.name);
+      // Only mark others' messages as read
+      if (message.sender !== currentUser.name && message.status !== "read") {
+        const messageRef = ref(rtdb, `messages/${message.id}`);
+        update(messageRef, {
+          status: "read",
+          readAt: serverTimestamp(),
+        });
       }
     });
   }, [messages, currentUser]);
@@ -55,13 +51,11 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
           sender: currentUser.name,
           timestamp: serverTimestamp(),
           createdAt: new Date().toISOString(),
-          readBy: {
-            [currentUser.name]: true // Sender ne khud read kar liya
-          }
+          status: "sent", // Initial status
         });
         setNewMessage("");
         setShowEmojiPicker(false);
-        
+
         setTimeout(() => {
           scrollToBottom("auto");
           if (messagesContainerRef.current) {
@@ -74,42 +68,73 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     }
   };
 
+  // Simulate delivery status after 1 second
+  useEffect(() => {
+    if (!currentUser) return;
+
+    messages.forEach((message) => {
+      if (
+        message.sender === currentUser.name &&
+        message.status === "sent" &&
+        message.createdAt
+      ) {
+        const sentTime = new Date(message.createdAt).getTime();
+        const now = Date.now();
+        if (now - sentTime > 1000) {
+          const messageRef = ref(rtdb, `messages/${message.id}`);
+          update(messageRef, {
+            status: "delivered",
+            deliveredAt: serverTimestamp(),
+          });
+        }
+      }
+    });
+  }, [messages, currentUser]);
+
   const addEmoji = (emoji) => {
     setNewMessage(newMessage + emoji);
     setShowEmojiPicker(false);
   };
 
-  // NEW: Check if message is read by others
-  const getReadStatus = (message) => {
-    if (!message.readBy) return "sent";
-    
-    const readByUsers = Object.keys(message.readBy).filter(
-      user => user !== currentUser.name
-    );
-    
-    if (readByUsers.length > 0) {
-      return "read";
-    }
-    return "sent";
-  };
-
   const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
+
+  // Read Receipt Icon Component
+  const ReadReceipt = ({ status }) => {
+    if (status === "read") {
+      return (
+        <div className="flex items-center space-x-0.5">
+          <CheckCheck className="w-3 h-3 text-blue-400" />
+        </div>
+      );
+    }
+    if (status === "delivered") {
+      return (
+        <div className="flex items-center space-x-0.5">
+          <CheckCheck className="w-3 h-3" />
+        </div>
+      );
+    }
+    // sent
+    return <Check className="w-3 h-3" />;
+  };
 
   return (
     <div className="flex flex-col h-screen bg-black">
-      <div 
+      <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-zinc-900 to-black"
-        style={{ 
-          scrollBehavior: 'auto',
-          overflowAnchor: 'none'
+        style={{
+          scrollBehavior: "auto",
+          overflowAnchor: "none",
         }}
       >
         {messages.length === 0 ? (
           <div className="text-center text-zinc-400 mt-32">
             <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            <h3 className="text-xl font-semibold mb-2 text-zinc-300">No messages yet</h3>
-            <p className="text-zinc-500">Start the conversation</p>
+            <h3 className="text-xl font-semibold mb-2 text-zinc-300">
+              No messages yet
+            </h3>
+            <p className="text-zinc-500">Start the conversation ✨</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -117,7 +142,9 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
               <div
                 key={message.id}
                 className={`flex ${
-                  message.sender === currentUser?.name ? "justify-end" : "justify-start"
+                  message.sender === currentUser?.name
+                    ? "justify-end"
+                    : "justify-start"
                 }`}
               >
                 <div className="max-w-xs sm:max-w-sm lg:max-w-md">
@@ -133,32 +160,32 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
                         {message.sender}
                       </p>
                     )}
-                    <p className="text-sm leading-relaxed mb-2">{message.text}</p>
-                    
-                    {/* Time + Read Receipt */}
-                    <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm leading-relaxed mb-2">
+                      {message.text}
+                    </p>
+                    <div className="flex items-center justify-between">
                       <p
                         className={`text-xs opacity-70 ${
-                          message.sender === currentUser?.name ? "text-black" : "text-zinc-400"
+                          message.sender === currentUser?.name
+                            ? "text-black"
+                            : "text-zinc-400"
                         }`}
                       >
                         {message.createdAt
-                          ? new Date(message.createdAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                          ? new Date(message.createdAt).toLocaleTimeString(
+                              [],
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )
                           : "Sending..."}
                       </p>
-                      
-                      {/* Read Receipt - Sirf apne messages ke liye */}
+                      {/* Show read receipt only for sender's messages */}
                       {message.sender === currentUser?.name && (
-                        <span className={`text-xs ${
-                          getReadStatus(message) === "read" 
-                            ? "text-blue-400" 
-                            : "text-zinc-400"
-                        }`}>
-                          {getReadStatus(message) === "read" ? "✓✓" : "✓"}
-                        </span>
+                        <div className="ml-2">
+                          <ReadReceipt status={message.status || "sent"} />
+                        </div>
                       )}
                     </div>
                   </div>
