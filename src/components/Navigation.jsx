@@ -42,7 +42,7 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
           {/* Left: Brand / Menu */}
           <div className="flex items-center gap-3">
             {/* Brand */}
-            <div className="text-lg font-semibold tracking-wide">VIBES</div>
+            <div className="text-lg font-semibold tracking-wide">Penguin</div>
 
             {/* Desktop nav */}
             <div className="hidden md:flex items-center gap-8 ml-6">
