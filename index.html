@@ -1,11 +1,25 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/penguin.png" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Penguin</title>
-    <link rel="manifest" href="/manifest.json" />
+    <title>React Vite App</title>
+
+    <!-- ✅ OneSignal SDK -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function (OneSignal) {
+        await OneSignal.init({
+          appId: "d2752d14-d68f-4b5a-922d-e7d5fd10a540", // 👈 apna App ID
+          safari_web_id: "web.onesignal.auto.194684e9-1eab-45d0-91dc-36dcc25bd22e", // Safari ke liye (optional)
+          notifyButton: {
+            enable: true, // 👈 site pe floating bell button show karega
+          },
+        });
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
