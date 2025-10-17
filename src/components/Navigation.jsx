@@ -1,10 +1,42 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { LogOut, MessageCircle, Gamepad2, Palette, Menu, X } from "lucide-react";
+import { ref, set, onValue } from "firebase/database";
+import { rtdb } from "../firebase/config";
 
-const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSection }) => {
+const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSection, userPresence, usersMap = {} }) => {
   const [open, setOpen] = useState(false);
+  const [typingUsers, setTypingUsers] = useState({});
+  
+  // Get other user's presence (for 1:1 chat)
+  const otherUser = React.useMemo(() => {
+    if (!currentUser) return null;
+    const names = Object.keys(usersMap || {});
+    const others = names.filter((n) => n !== currentUser.name);
+    return others.length > 0 ? usersMap[others[0]] : null;
+  }, [usersMap, currentUser]);
+
+  // Subscribe to typing indicators
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const typingRef = ref(rtdb, "typing");
+    const unsubscribe = onValue(typingRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setTypingUsers(data);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   const handleLogout = () => {
+    if (currentUser?.name) {
+      const userRef = ref(rtdb, `users/${currentUser.name}`);
+      set(userRef, {
+        name: currentUser.name,
+        isOnline: false,
+        lastSeen: Date.now(),
+      });
+    }
     localStorage.removeItem("chatUser");
     setCurrentUser(null);
     setActiveSection("chat");
@@ -35,6 +67,33 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
     </button>
   );
 
+  // Function to check if someone is typing
+  const getTypingStatus = (user) => {
+    if (!user) return null;
+    
+    const isTyping = typingUsers[user.name]?.isTyping;
+    const typingTime = typingUsers[user.name]?.timestamp || 0;
+    const now = Date.now();
+    const isRecentTyping = isTyping && (now - typingTime <= 5000);
+    
+    if (isRecentTyping) {
+      return (
+        <span className="flex items-center gap-1 text-amber-400 animate-pulse">
+          <span className="inline-block w-1 h-1 bg-amber-400 rounded-full animate-bounce"></span>
+          <span className="inline-block w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+          <span className="inline-block w-1 h-1 bg-amber-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></span>
+          <span className="ml-1">typing...</span>
+        </span>
+      );
+    } else if (user.isOnline) {
+      return <span className="text-emerald-400">Online</span>;
+    } else if (user.lastSeen) {
+      return `Last seen ${new Date(user.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    } else {
+      return <span className="text-gray-500">Offline</span>;
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50">
       <nav className="backdrop-blur-md bg-gray-900/95 border-b border-gray-800 text-white px-4 md:px-8 py-3 shadow-lg">
@@ -42,7 +101,14 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
           {/* Left: Brand / Menu */}
           <div className="flex items-center gap-3">
             {/* Brand */}
-            <div className="text-lg font-semibold tracking-wide">Penguin</div>
+            <div className="flex items-center gap-2">
+              <div className="text-lg font-semibold tracking-wide">Penguin</div>
+              {otherUser && (
+                <div className="text-xs">
+                  {getTypingStatus(otherUser)}
+                </div>
+              )}
+            </div>
 
             {/* Desktop nav */}
             <div className="hidden md:flex items-center gap-8 ml-6">
@@ -54,9 +120,14 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
 
           {/* Right: User + Logout (desktop) */}
           <div className="hidden md:flex items-center gap-5">
-            <span className="text-sm font-medium text-gray-200 bg-gray-800 px-4 py-1.5 rounded-full shadow">
-              {currentUser?.name}
-            </span>
+            <div className="flex items-center gap-3 bg-gray-800 px-4 py-1.5 rounded-full shadow">
+              <span className="text-sm font-medium text-gray-200">{currentUser?.name}</span>
+              {otherUser && (
+                <span className="text-xs">
+                  {getTypingStatus(otherUser)}
+                </span>
+              )}
+            </div>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-5 py-2 rounded-full text-sm font-medium shadow-md transition-all"
@@ -92,9 +163,14 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
             <div className="mt-4 h-px bg-gray-800" />
 
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-200 bg-gray-800 px-3 py-1.5 rounded-full">
-                {currentUser?.name}
-              </span>
+              <div className="flex items-center gap-2 bg-gray-800 px-3 py-1.5 rounded-full">
+                <span className="text-sm font-medium text-gray-200">{currentUser?.name}</span>
+                {otherUser && (
+                  <span className="text-xs">
+                    {getTypingStatus(otherUser)}
+                  </span>
+                )}
+              </div>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-xl text-sm font-medium shadow-md transition-all"
