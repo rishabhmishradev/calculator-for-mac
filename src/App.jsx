@@ -178,7 +178,7 @@ const App = () => {
   }
 
   return (
-    <div className="h-screen w-screen bg-gray-950 flex flex-col overflow-hidden">
+   <div className="min-h-[100dvh] w-screen bg-gray-950 flex flex-col overflow-hidden">
       <Navigation
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
