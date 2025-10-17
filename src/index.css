@@ -9,3 +9,9 @@ body,
   padding: 0;
   overflow: hidden; /* 👈 extra scroll remove */
 }
+
+@layer utilities {
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
