@@ -69,7 +69,7 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
   );
 
   return (
-    <header className="sticky top-0 z-50">
+    <header className="sticky top-0 z-50 safe-area-inset-top">
       <nav className="backdrop-blur-md bg-gray-900/95 border-b border-gray-800 text-white px-4 md:px-8 py-3 shadow-lg">
         <div className="mx-auto max-w-6xl flex items-center justify-between">
           {/* Left: Brand / Menu */}
