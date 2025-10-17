@@ -1,13 +1,22 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ref, push, serverTimestamp, update, onValue } from "firebase/database";
+import { ref, push, serverTimestamp, update, onValue, set } from "firebase/database"; // ✅ 'set' added
 import { rtdb } from "../firebase/config";
 import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
+import { deleteMessage as softDeleteMessage } from "../utils/messageActions";
 
-const ChatRoom = ({ currentUser, isOnline, messages }) => {
+const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
   const [newMessage, setNewMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const [otherUserPresence, setOtherUserPresence] = useState(null);
+  const [unsendHintSeen, setUnsendHintSeen] = useState(
+    typeof window !== "undefined" && localStorage.getItem("unsendHintSeen") === "1"
+  );
+  const longPressTimerRef = useRef(null);
+  const longPressTargetRef = useRef(null);
+  const [typingUsers, setTypingUsers] = useState({});
+  const typingTimeoutRef = useRef(null);
 
   const scrollToBottom = (behavior = "auto") => {
     if (messagesEndRef.current) {
@@ -26,12 +35,54 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     scrollToBottom("auto");
   }, [messages]);
 
-  // Mark messages as read when they come into view
+  // Determine other user
+  useEffect(() => {
+    if (!currentUser) return;
+    const names = Object.keys(usersMap || {});
+    const others = names.filter((n) => n !== currentUser.name);
+    if (others.length > 0) {
+      const other = usersMap[others[0]];
+      setOtherUserPresence(other || null);
+    } else {
+      setOtherUserPresence(null);
+    }
+  }, [usersMap, currentUser]);
+
+  // Subscribe to typing indicators
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const typingRef = ref(rtdb, "typing");
+    const unsubscribe = onValue(typingRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      setTypingUsers(data);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  // ✅ Cleanup typing on unmount
+  useEffect(() => {
+    return () => {
+      if (currentUser) {
+        const typingRef = ref(rtdb, `typing/${currentUser.name}`);
+        set(typingRef, {
+          isTyping: false,
+          timestamp: Date.now(),
+        }).catch((err) => console.error("Error clearing typing:", err));
+        
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+      }
+    };
+  }, [currentUser]);
+
+  // Mark messages as read
   useEffect(() => {
     if (!currentUser || !messages.length) return;
 
     messages.forEach((message) => {
-      // Only mark others' messages as read
       if (message.sender !== currentUser.name && message.status !== "read") {
         const messageRef = ref(rtdb, `messages/${message.id}`);
         update(messageRef, {
@@ -45,14 +96,26 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const sendMessage = async () => {
     if (newMessage.trim() && currentUser && isOnline) {
       try {
+        // ✅ Clear typing immediately when sending
+        const typingRef = ref(rtdb, `typing/${currentUser.name}`);
+        await set(typingRef, {
+          isTyping: false,
+          timestamp: Date.now(),
+        });
+        
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+
         const messagesRef = ref(rtdb, "messages");
         await push(messagesRef, {
           text: newMessage,
           sender: currentUser.name,
           timestamp: serverTimestamp(),
           createdAt: new Date().toISOString(),
-          status: "sent", // Initial status
+          status: "sent",
         });
+        
         setNewMessage("");
         setShowEmojiPicker(false);
 
@@ -68,7 +131,7 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     }
   };
 
-  // Simulate delivery status after 1 second
+  // Simulate delivery status
   useEffect(() => {
     if (!currentUser) return;
 
@@ -96,47 +159,129 @@ const ChatRoom = ({ currentUser, isOnline, messages }) => {
     setShowEmojiPicker(false);
   };
 
+  // ✅ Handle typing with proper cleanup
+  const handleTyping = (text) => {
+    setNewMessage(text);
+    
+    if (!currentUser) return;
+    
+    const typingRef = ref(rtdb, `typing/${currentUser.name}`);
+    
+    if (text.trim()) {
+      // User is typing
+      set(typingRef, {
+        isTyping: true,
+        timestamp: Date.now(),
+      }).catch((err) => console.error("Error setting typing:", err));
+      
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Stop typing after 2 seconds
+      typingTimeoutRef.current = setTimeout(() => {
+        set(typingRef, {
+          isTyping: false,
+          timestamp: Date.now(),
+        }).catch((err) => console.error("Error clearing typing:", err));
+      }, 2000);
+    } else {
+      // Empty input - stop typing
+      set(typingRef, {
+        isTyping: false,
+        timestamp: Date.now(),
+      }).catch((err) => console.error("Error clearing typing:", err));
+      
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    }
+  };
+
   const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
 
- // Read Receipt Icon Component
-const ReadReceipt = ({ status }) => {
-  const baseClasses = "w-5 h-5"; // Make it bigger
-  if (status === "read") {
-    return (
-      <div className="flex items-center space-x-1">
-        <CheckCheck className={`${baseClasses} text-green-400`} />
-      </div>
-    );
-  }
-  if (status === "delivered") {
-    return (
-      <div className="flex items-center space-x-1">
-        <CheckCheck className={`${baseClasses} text-zinc-400`} />
-      </div>
-    );
-  }
-  // sent
-  return <Check className={`${baseClasses} text-zinc-400`} />;
-};
+  const handleUnsend = (message) => {
+    if (!message || message.sender !== currentUser?.name) return;
+    const ok = window.confirm("Unsend this message?");
+    if (!ok) return;
+    softDeleteMessage(message.id);
+    if (!unsendHintSeen) {
+      setUnsendHintSeen(true);
+      try { localStorage.setItem("unsendHintSeen", "1"); } catch {}
+    }
+  };
 
+  const handleTouchStart = (message) => {
+    if (message.sender !== currentUser?.name) return;
+    longPressTargetRef.current = message;
+    longPressTimerRef.current = setTimeout(() => {
+      handleUnsend(longPressTargetRef.current);
+    }, 600);
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+      longPressTargetRef.current = null;
+    }
+  };
+
+  const ReadReceipt = ({ status }) => {
+    const baseClasses = "w-4 h-4";
+    if (status === "read") {
+      return <CheckCheck className={`${baseClasses} text-green-400`} />;
+    }
+    if (status === "delivered") {
+      return <CheckCheck className={`${baseClasses} text-zinc-400`} />;
+    }
+    return <Check className={`${baseClasses} text-zinc-400`} />;
+  };
+
+  // Check if someone is typing
+  const someoneIsTyping = Object.keys(typingUsers).some((userName) => {
+    if (userName === currentUser?.name) return false;
+    const userTyping = typingUsers[userName];
+    if (!userTyping?.isTyping) return false;
+    const typingTime = userTyping.timestamp || 0;
+    const now = Date.now();
+    return (now - typingTime) <= 5000;
+  });
 
   return (
     <div className="flex flex-col h-screen bg-black">
+      {/* Header */}
+      <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-900/60 text-zinc-200">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold">
+              {otherUserPresence?.name || "Chat"}
+            </span>
+            <span className="text-xs text-zinc-400">
+              {someoneIsTyping
+                ? "typing..."
+                : otherUserPresence?.isOnline
+                ? "Online"
+                : otherUserPresence?.lastSeen
+                ? `Last seen ${new Date(otherUserPresence.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                : ""}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
       <div
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-zinc-900 to-black"
-        style={{
-          scrollBehavior: "auto",
-          overflowAnchor: "none",
-        }}
+        style={{ scrollBehavior: "auto", overflowAnchor: "none" }}
       >
         {messages.length === 0 ? (
           <div className="text-center text-zinc-400 mt-32">
             <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
-            <h3 className="text-xl font-semibold mb-2 text-zinc-300">
-              No messages yet
-            </h3>
-            <p className="text-zinc-500">Start the conversation ✨</p>
+            <h3 className="text-xl font-semibold mb-2 text-zinc-300">No messages yet</h3>
+            <p className="text-zinc-500">Start the conversation</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -144,9 +289,7 @@ const ReadReceipt = ({ status }) => {
               <div
                 key={message.id}
                 className={`flex ${
-                  message.sender === currentUser?.name
-                    ? "justify-end"
-                    : "justify-start"
+                  message.sender === currentUser?.name ? "justify-end" : "justify-start"
                 }`}
               >
                 <div className="max-w-xs sm:max-w-sm lg:max-w-md">
@@ -156,40 +299,47 @@ const ReadReceipt = ({ status }) => {
                         ? "bg-gradient-to-r from-amber-500 to-yellow-600 text-black"
                         : "bg-gradient-to-r from-zinc-800 to-zinc-700 text-white border border-zinc-600"
                     }`}
+                    onContextMenu={(e) => {
+                      if (message.sender === currentUser?.name) {
+                        e.preventDefault();
+                        handleUnsend(message);
+                      }
+                    }}
+                    onTouchStart={() => handleTouchStart(message)}
+                    onTouchEnd={clearLongPress}
+                    onTouchCancel={clearLongPress}
+                    onTouchMove={clearLongPress}
                   >
                     {message.sender !== currentUser?.name && (
                       <p className="text-xs font-semibold text-amber-400 mb-2 tracking-wide">
                         {message.sender}
                       </p>
                     )}
-                    <p className="text-sm leading-relaxed mb-2">
-                      {message.text}
-                    </p>
+                    <p className="text-sm leading-relaxed mb-2">{message.text}</p>
                     <div className="flex items-center justify-between">
                       <p
                         className={`text-xs opacity-70 ${
-                          message.sender === currentUser?.name
-                            ? "text-black"
-                            : "text-zinc-400"
+                          message.sender === currentUser?.name ? "text-black" : "text-zinc-400"
                         }`}
                       >
                         {message.createdAt
-                          ? new Date(message.createdAt).toLocaleTimeString(
-                              [],
-                              {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }
-                            )
+                          ? new Date(message.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                           : "Sending..."}
                       </p>
-                      {/* Show read receipt only for sender's messages */}
                       {message.sender === currentUser?.name && (
                         <div className="ml-2">
                           <ReadReceipt status={message.status || "sent"} />
                         </div>
                       )}
                     </div>
+                    {message.sender === currentUser?.name && !unsendHintSeen && (
+                      <div className="mt-1 text-[10px] text-zinc-500 select-none">
+                        Long-press to Unsend
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -199,7 +349,7 @@ const ReadReceipt = ({ status }) => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Section */}
+      {/* Input */}
       <div className="p-4 bg-zinc-900">
         {showEmojiPicker && (
           <div className="mb-4 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
@@ -230,17 +380,12 @@ const ReadReceipt = ({ status }) => {
             <input
               type="text"
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => handleTyping(e.target.value)}
               onKeyPress={(e) => e.key === "Enter" && sendMessage()}
               placeholder={isOnline ? "Type a message..." : "No connection"}
               disabled={!isOnline}
               className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all disabled:opacity-50"
             />
-            {newMessage && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
-              </div>
-            )}
           </div>
 
           <button
