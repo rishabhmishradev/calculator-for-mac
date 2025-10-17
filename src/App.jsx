@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ref, onValue, set, serverTimestamp } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import { rtdb } from "./firebase/config";
 
 // Components
@@ -41,7 +41,6 @@ const App = () => {
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
@@ -51,7 +50,6 @@ const App = () => {
   // ✅ Real-time Messages Listener
   useEffect(() => {
     if (!currentUser) return;
-
     const messagesRef = ref(rtdb, "messages");
     const unsubscribe = onValue(messagesRef, (snapshot) => {
       const data = snapshot.val();
@@ -60,21 +58,15 @@ const App = () => {
           id: key,
           ...value,
         }));
-        setMessages(
-          messagesList.sort(
-            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-          )
-        );
+        setMessages(messagesList.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
       }
     });
-
     return () => unsubscribe();
   }, [currentUser]);
 
-  // ✅ Subscribe to current user's presence (users/<name>)
+  // ✅ Subscribe to user presence
   useEffect(() => {
     if (!currentUser) return;
-
     const userRef = ref(rtdb, `users/${currentUser.name}`);
     const unsubscribe = onValue(userRef, (snapshot) => {
       const data = snapshot.val();
@@ -85,44 +77,26 @@ const App = () => {
         });
       }
     });
-
     return () => unsubscribe();
   }, [currentUser]);
 
-  // ✅ Heartbeat to keep user online while active
+  // ✅ Heartbeat (keep user online)
   useEffect(() => {
     if (!currentUser) return;
-
     const userRef = ref(rtdb, `users/${currentUser.name}`);
-    
-    // Update online status immediately
-    set(userRef, {
-      name: currentUser.name,
-      isOnline: true,
-      lastSeen: Date.now(),
-    });
+    set(userRef, { name: currentUser.name, isOnline: true, lastSeen: Date.now() });
 
-    // Keep user online with periodic heartbeat
-    const heartbeatInterval = setInterval(() => {
-      set(userRef, {
-        name: currentUser.name,
-        isOnline: true,
-        lastSeen: Date.now(),
-      });
-    }, 30000); // Update every 30 seconds
+    const heartbeat = setInterval(() => {
+      set(userRef, { name: currentUser.name, isOnline: true, lastSeen: Date.now() });
+    }, 30000);
 
     return () => {
-      clearInterval(heartbeatInterval);
-      // Set offline when component unmounts
-      set(userRef, {
-        name: currentUser.name,
-        isOnline: false,
-        lastSeen: Date.now(),
-      });
+      clearInterval(heartbeat);
+      set(userRef, { name: currentUser.name, isOnline: false, lastSeen: Date.now() });
     };
   }, [currentUser]);
 
-  // ✅ Subscribe to all users for showing others' last seen
+  // ✅ Subscribe to all users
   useEffect(() => {
     const usersRef = ref(rtdb, "users");
     const unsubscribe = onValue(usersRef, (snapshot) => {
@@ -132,35 +106,25 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Mark offline with lastSeen on tab close/refresh
+  // ✅ Offline on tab close
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (!currentUser) return;
       const userRef = ref(rtdb, `users/${currentUser.name}`);
-      // Best-effort write
-      set(userRef, {
-        name: currentUser.name,
-        isOnline: false,
-        lastSeen: Date.now(),
-      });
+      set(userRef, { name: currentUser.name, isOnline: false, lastSeen: Date.now() });
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [currentUser]);
 
-  // ✅ Real-time Game State Sync
+  // ✅ Real-time Game State
   useEffect(() => {
     if (!currentUser) return;
-
     const gameRef = ref(rtdb, "gameStates");
     const unsubscribe = onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
-      if (data) {
-        setGameStates(data);
-      }
+      if (data) setGameStates(data);
     });
-
     return () => unsubscribe();
   }, [currentUser]);
 
@@ -172,13 +136,14 @@ const App = () => {
     }
   };
 
-  // ✅ If not logged in → show AuthScreen
+  // ✅ If not logged in → AuthScreen
   if (!currentUser) {
     return <AuthScreen setCurrentUser={setCurrentUser} isOnline={isOnline} />;
   }
 
+  // ✅ Main return with safe-area fix
   return (
-   <div className="min-h-[100dvh] w-screen bg-gray-950 flex flex-col overflow-hidden">
+    <div className="min-h-[100dvh] w-screen flex flex-col bg-gray-950 text-white safe-area overflow-hidden">
       <Navigation
         currentUser={currentUser}
         setCurrentUser={setCurrentUser}
@@ -189,21 +154,12 @@ const App = () => {
         usersMap={usersMap}
       />
 
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-y-auto">
         {activeSection === "chat" && (
-          <ChatRoom
-            currentUser={currentUser}
-            isOnline={isOnline}
-            messages={messages}
-            usersMap={usersMap}
-          />
+          <ChatRoom currentUser={currentUser} isOnline={isOnline} messages={messages} usersMap={usersMap} />
         )}
         {activeSection === "games" && (
-          <GamesSection
-            gameStates={gameStates}
-            updateGameState={updateGameState}
-            isOnline={isOnline}
-          />
+          <GamesSection gameStates={gameStates} updateGameState={updateGameState} isOnline={isOnline} />
         )}
         {activeSection === "creative" && <CreativeZone />}
       </main>
