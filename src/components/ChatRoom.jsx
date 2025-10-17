@@ -1,164 +1,266 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ref, push, set, serverTimestamp, onValue } from "firebase/database";
+import React, { useState, useEffect, useRef } from "react";
+import { ref, push, serverTimestamp, update, onValue } from "firebase/database";
 import { rtdb } from "../firebase/config";
-import { Send } from "lucide-react";
+import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
 
-const ChatRoom = ({ currentUser, isOnline, messages, usersMap }) => {
+const ChatRoom = ({ currentUser, isOnline, messages }) => {
   const [newMessage, setNewMessage] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
-  const [typingStatus, setTypingStatus] = useState({});
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const messagesContainerRef = useRef(null);
 
-  // ✅ Scroll to bottom on new messages
-  useEffect(() => {
+  const scrollToBottom = (behavior = "auto") => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current.scrollIntoView({ behavior });
     }
-  }, [messages]);
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
 
-  // ✅ Typing indicator listener
   useEffect(() => {
-    const typingRef = ref(rtdb, "typing");
-    const unsubscribe = onValue(typingRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      setTypingStatus(data);
-    });
-    return () => unsubscribe();
+    scrollToBottom("auto");
   }, []);
 
-  // ✅ Update typing status in DB
-  const updateTypingStatus = (status) => {
-    if (!currentUser) return;
-    const typingRef = ref(rtdb, `typing/${currentUser.name}`);
-    set(typingRef, {
-      name: currentUser.name,
-      isTyping: status,
-      timestamp: Date.now(),
+  useEffect(() => {
+    scrollToBottom("auto");
+  }, [messages]);
+
+  // Mark messages as read when they come into view
+  useEffect(() => {
+    if (!currentUser || !messages.length) return;
+
+    messages.forEach((message) => {
+      // Only mark others' messages as read
+      if (message.sender !== currentUser.name && message.status !== "read") {
+        const messageRef = ref(rtdb, `messages/${message.id}`);
+        update(messageRef, {
+          status: "read",
+          readAt: serverTimestamp(),
+        });
+      }
     });
-  };
+  }, [messages, currentUser]);
 
-  // ✅ Handle input typing
-  const handleTyping = (e) => {
-    setNewMessage(e.target.value);
-    if (!isTyping) {
-      setIsTyping(true);
-      updateTypingStatus(true);
+  const sendMessage = async () => {
+    if (newMessage.trim() && currentUser && isOnline) {
+      try {
+        const messagesRef = ref(rtdb, "messages");
+        await push(messagesRef, {
+          text: newMessage,
+          sender: currentUser.name,
+          timestamp: serverTimestamp(),
+          createdAt: new Date().toISOString(),
+          status: "sent", // Initial status
+        });
+        setNewMessage("");
+        setShowEmojiPicker(false);
+
+        setTimeout(() => {
+          scrollToBottom("auto");
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+          }
+        }, 50);
+      } catch (error) {
+        console.error("Error sending message:", error);
+      }
     }
-
-    clearTimeout(handleTyping.timeout);
-    handleTyping.timeout = setTimeout(() => {
-      setIsTyping(false);
-      updateTypingStatus(false);
-    }, 2000);
   };
 
-  // ✅ Send message
-  const handleSend = () => {
-    if (newMessage.trim() === "") return;
+  // Simulate delivery status after 1 second
+  useEffect(() => {
+    if (!currentUser) return;
 
-    const messagesRef = ref(rtdb, "messages");
-    const messageData = {
-      text: newMessage,
-      sender: currentUser.name,
-      createdAt: serverTimestamp(),
-    };
+    messages.forEach((message) => {
+      if (
+        message.sender === currentUser.name &&
+        message.status === "sent" &&
+        message.createdAt
+      ) {
+        const sentTime = new Date(message.createdAt).getTime();
+        const now = Date.now();
+        if (now - sentTime > 1000) {
+          const messageRef = ref(rtdb, `messages/${message.id}`);
+          update(messageRef, {
+            status: "delivered",
+            deliveredAt: serverTimestamp(),
+          });
+        }
+      }
+    });
+  }, [messages, currentUser]);
 
-    push(messagesRef, messageData);
-    setNewMessage("");
-    updateTypingStatus(false);
-    setIsTyping(false);
+  const addEmoji = (emoji) => {
+    setNewMessage(newMessage + emoji);
+    setShowEmojiPicker(false);
   };
 
-  // ✅ Scroll handling
-  const handleScroll = () => {
-    if (!messagesContainerRef.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-    const atBottom = scrollHeight - scrollTop - clientHeight < 100;
-    setShowScrollButton(!atBottom);
-  };
+  const emojiList = ["😊", "😂", "❤️", "👍", "🎉", "🔥", "💯", "🤔", "😍", "🥳"];
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+ // Read Receipt Icon Component
+const ReadReceipt = ({ status }) => {
+  const baseClasses = "w-5 h-5"; // Make it bigger
+  if (status === "read") {
+    return (
+      <div className="flex items-center space-x-1">
+        <CheckCheck className={`${baseClasses} text-green-400`} />
+      </div>
+    );
+  }
+  if (status === "delivered") {
+    return (
+      <div className="flex items-center space-x-1">
+        <CheckCheck className={`${baseClasses} text-zinc-400`} />
+      </div>
+    );
+  }
+  // sent
+  return <Check className={`${baseClasses} text-zinc-400`} />;
+};
 
-  // ✅ Show other users typing
-  const activeTypingUsers = Object.entries(typingStatus)
-    .filter(([name, data]) => name !== currentUser.name && data.isTyping)
-    .map(([name]) => name);
 
   return (
-    <div className="flex flex-col flex-1 bg-black text-white">
-      {/* Chat Messages */}
+    <div className="flex flex-col h-screen bg-black">
       <div
-        className="flex-1 overflow-y-auto p-4 space-y-3"
-        onScroll={handleScroll}
         ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-zinc-900 to-black"
+        style={{
+          scrollBehavior: "auto",
+          overflowAnchor: "none",
+        }}
       >
-        {messages.map((msg) => {
-          const isOwn = msg.sender === currentUser.name;
-          return (
-            <div
-              key={msg.id}
-              className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-            >
+        {messages.length === 0 ? (
+          <div className="text-center text-zinc-400 mt-32">
+            <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-30" />
+            <h3 className="text-xl font-semibold mb-2 text-zinc-300">
+              No messages yet
+            </h3>
+            <p className="text-zinc-500">Start the conversation ✨</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((message) => (
               <div
-                className={`max-w-xs md:max-w-sm px-4 py-2 rounded-2xl shadow-md ${
-                  isOwn
-                    ? "bg-purple-600 text-white rounded-br-none"
-                    : "bg-gray-800 text-gray-200 rounded-bl-none"
+                key={message.id}
+                className={`flex ${
+                  message.sender === currentUser?.name
+                    ? "justify-end"
+                    : "justify-start"
                 }`}
               >
-                <p className="text-sm break-words">{msg.text}</p>
-                <span className="text-[10px] text-gray-400 block mt-1">
-                  {msg.sender}
-                </span>
+                <div className="max-w-xs sm:max-w-sm lg:max-w-md">
+                  <div
+                    className={`px-4 py-3 rounded-2xl shadow-lg ${
+                      message.sender === currentUser?.name
+                        ? "bg-gradient-to-r from-amber-500 to-yellow-600 text-black"
+                        : "bg-gradient-to-r from-zinc-800 to-zinc-700 text-white border border-zinc-600"
+                    }`}
+                  >
+                    {message.sender !== currentUser?.name && (
+                      <p className="text-xs font-semibold text-amber-400 mb-2 tracking-wide">
+                        {message.sender}
+                      </p>
+                    )}
+                    <p className="text-sm leading-relaxed mb-2">
+                      {message.text}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <p
+                        className={`text-xs opacity-70 ${
+                          message.sender === currentUser?.name
+                            ? "text-black"
+                            : "text-zinc-400"
+                        }`}
+                      >
+                        {message.createdAt
+                          ? new Date(message.createdAt).toLocaleTimeString(
+                              [],
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )
+                          : "Sending..."}
+                      </p>
+                      {/* Show read receipt only for sender's messages */}
+                      {message.sender === currentUser?.name && (
+                        <div className="ml-2">
+                          <ReadReceipt status={message.status || "sent"} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            ))}
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Typing Indicator */}
-      {activeTypingUsers.length > 0 && (
-        <div className="px-4 py-1 text-xs text-gray-400 animate-pulse">
-          {activeTypingUsers.join(", ")} typing...
+      {/* Input Section */}
+      <div className="p-4 bg-zinc-900">
+        {showEmojiPicker && (
+          <div className="mb-4 p-3 bg-zinc-800 rounded-xl border border-zinc-700">
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+              {emojiList.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => addEmoji(emoji)}
+                  className="text-xl p-2 hover:bg-zinc-700 rounded-lg transition-colors hover:scale-110 transform"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
+            disabled={!isOnline}
+          >
+            <Smile className="w-5 h-5 text-amber-400" />
+          </button>
+
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              placeholder={isOnline ? "Type a message..." : "No connection"}
+              disabled={!isOnline}
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all disabled:opacity-50"
+            />
+            {newMessage && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse"></div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={sendMessage}
+            disabled={!isOnline || !newMessage.trim()}
+            className="p-3 bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 disabled:from-zinc-700 disabled:to-zinc-600 text-black rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed"
+          >
+            <Send className="w-5 h-5" />
+          </button>
         </div>
-      )}
 
-      {/* Input Bar */}
-      <div className="flex items-center gap-2 border-t border-gray-800 bg-gray-900 px-4 py-3">
-        <input
-          type="text"
-          placeholder={
-            isOnline ? "Type a message..." : "You are offline. Messages paused."
-          }
-          value={newMessage}
-          onChange={handleTyping}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          className="flex-1 bg-gray-800 text-white placeholder-gray-500 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-          disabled={!isOnline}
-        />
-        <button
-          onClick={handleSend}
-          className="bg-purple-600 hover:bg-purple-700 p-2 rounded-full transition-all"
-          disabled={!isOnline}
-        >
-          <Send size={18} />
-        </button>
+        {isOnline && (
+          <div className="flex items-center justify-center mt-3">
+            <div className="flex items-center space-x-2 text-xs text-zinc-500">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+              <span>Connected</span>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Scroll to Bottom Button */}
-      {showScrollButton && (
-        <button
-          onClick={scrollToBottom}
-          className="absolute bottom-24 right-6 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-full shadow-lg transition"
-        >
-          ↓
-        </button>
-      )}
     </div>
   );
 };
