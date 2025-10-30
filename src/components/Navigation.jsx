@@ -121,7 +121,7 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
           {/* Right: User + Logout (desktop) */}
           <div className="hidden md:flex items-center gap-5">
             <div className="flex items-center gap-3 bg-gray-800 px-4 py-1.5 rounded-full shadow">
-              <span className="text-sm font-medium text-gray-200">{currentUser?.name}</span>
+              <span className="text-sm font-medium text-gray-200">{otherUser?.name}</span>
               {otherUser && (
                 <span className="text-xs">
                   {getTypingStatus(otherUser)}
@@ -164,7 +164,7 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
 
             <div className="mt-4 flex items-center justify-between">
               <div className="flex items-center gap-2 bg-gray-800 px-3 py-1.5 rounded-full">
-                <span className="text-sm font-medium text-gray-200">{currentUser?.name}</span>
+                <span className="text-sm font-medium text-gray-200">{otherUser?.name}</span>
                 {otherUser && (
                   <span className="text-xs">
                     {getTypingStatus(otherUser)}
