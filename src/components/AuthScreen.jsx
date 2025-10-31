@@ -10,7 +10,7 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
 
   const handleLogin = () => {
     const validUsers = {
-      Rishabh: "1234",
+      boy: "1234",
       Saman: "chudail",
     };
 
