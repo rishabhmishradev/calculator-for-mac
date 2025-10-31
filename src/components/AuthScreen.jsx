@@ -11,7 +11,7 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
   const handleLogin = () => {
     const validUsers = {
       Rishabh: "1234",
-      Abhinav: "4321",
+      Saman: "chudail",
     };
 
     if (validUsers[name] === passcode) {
