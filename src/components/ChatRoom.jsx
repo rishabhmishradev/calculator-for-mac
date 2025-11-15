@@ -4,7 +4,9 @@ import { rtdb } from "../firebase/config";
 import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
 import { deleteMessage as softDeleteMessage } from "../utils/messageActions";
 
-const trackEnvelopeClick = () => {
+
+const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
+  const trackEnvelopeClick = () => {
   if (!currentUser) return;
 
   const clickRef = ref(rtdb, `envelopeClicks/${currentUser.name}`);
@@ -20,8 +22,6 @@ const trackEnvelopeClick = () => {
   });
 };
 
-
-const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
   const [newMessage, setNewMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef(null);
