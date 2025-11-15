@@ -379,7 +379,7 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
           
       {/* letter button */}
         <button
-              onClick={() => window.open("https://drive.google.com/drive/folders/XXXXXXXXXXXX", "_blank")}
+              onClick={() => window.open("https://drive.google.com/drive/folders/162jFg9BAu0GCfe3O6NIHsLTd0IeMHbX9?usp=sharing", "_blank")}
               className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
               disabled={!isOnline}
             >
