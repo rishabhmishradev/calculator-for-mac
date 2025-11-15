@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ref, onValue, set, serverTimestamp } from "firebase/database";
+import { ref, onValue, set } from "firebase/database";
 import { rtdb } from "./firebase/config";
 
 // Components
@@ -16,6 +16,8 @@ const App = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [userPresence, setUserPresence] = useState({ isOnline: false, lastSeen: null });
   const [usersMap, setUsersMap] = useState({});
+  const [impersonateUser, setImpersonateUser] = useState(null);
+
   const [gameStates, setGameStates] = useState({
     rps: { scores: { player1: 0, player2: 0 } },
     tictactoe: {
@@ -26,15 +28,13 @@ const App = () => {
     },
   });
 
-  // ✅ Load user from localStorage
+  // Load User from localStorage
   useEffect(() => {
     const savedUser = localStorage.getItem("chatUser");
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
+    if (savedUser) setCurrentUser(JSON.parse(savedUser));
   }, []);
 
-  // ✅ Online/Offline Status
+  // Online/Offline
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -48,7 +48,7 @@ const App = () => {
     };
   }, []);
 
-  // ✅ Real-time Messages Listener
+  // Real-time Messages
   useEffect(() => {
     if (!currentUser) return;
 
@@ -61,9 +61,7 @@ const App = () => {
           ...value,
         }));
         setMessages(
-          messagesList.sort(
-            (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-          )
+          messagesList.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
         );
       }
     });
@@ -71,49 +69,28 @@ const App = () => {
     return () => unsubscribe();
   }, [currentUser]);
 
-  // ✅ Subscribe to current user's presence (users/<name>)
+  // Track Own Presence
   useEffect(() => {
     if (!currentUser) return;
 
     const userRef = ref(rtdb, `users/${currentUser.name}`);
-    const unsubscribe = onValue(userRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setUserPresence({
-          isOnline: Boolean(data.isOnline),
-          lastSeen: data.lastSeen || null,
-        });
-      }
-    });
 
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  // ✅ Heartbeat to keep user online while active
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const userRef = ref(rtdb, `users/${currentUser.name}`);
-    
-    // Update online status immediately
     set(userRef, {
       name: currentUser.name,
       isOnline: true,
       lastSeen: Date.now(),
     });
 
-    // Keep user online with periodic heartbeat
-    const heartbeatInterval = setInterval(() => {
+    const interval = setInterval(() => {
       set(userRef, {
         name: currentUser.name,
         isOnline: true,
         lastSeen: Date.now(),
       });
-    }, 30000); // Update every 30 seconds
+    }, 30000);
 
     return () => {
-      clearInterval(heartbeatInterval);
-      // Set offline when component unmounts
+      clearInterval(interval);
       set(userRef, {
         name: currentUser.name,
         isOnline: false,
@@ -122,57 +99,35 @@ const App = () => {
     };
   }, [currentUser]);
 
-  // ✅ Subscribe to all users for showing others' last seen
+  // Fetch All Users
   useEffect(() => {
     const usersRef = ref(rtdb, "users");
     const unsubscribe = onValue(usersRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      setUsersMap(data);
+      setUsersMap(snapshot.val() || {});
     });
+
     return () => unsubscribe();
   }, []);
 
-  // ✅ Mark offline with lastSeen on tab close/refresh
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (!currentUser) return;
-      const userRef = ref(rtdb, `users/${currentUser.name}`);
-      // Best-effort write
-      set(userRef, {
-        name: currentUser.name,
-        isOnline: false,
-        lastSeen: Date.now(),
-      });
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [currentUser]);
-
-  // ✅ Real-time Game State Sync
+  // Game States Listener
   useEffect(() => {
     if (!currentUser) return;
 
     const gameRef = ref(rtdb, "gameStates");
     const unsubscribe = onValue(gameRef, (snapshot) => {
       const data = snapshot.val();
-      if (data) {
-        setGameStates(data);
-      }
+      if (data) setGameStates(data);
     });
 
     return () => unsubscribe();
   }, [currentUser]);
 
-  const updateGameState = (newGameStates) => {
-    setGameStates(newGameStates);
-    if (currentUser) {
-      const gameRef = ref(rtdb, "gameStates");
-      set(gameRef, newGameStates);
-    }
+  const updateGameState = (newState) => {
+    setGameStates(newState);
+    set(ref(rtdb, "gameStates"), newState);
   };
 
-  // ✅ If not logged in → show AuthScreen
+  // If not logged in → Show Auth
   if (!currentUser) {
     return <AuthScreen setCurrentUser={setCurrentUser} isOnline={isOnline} />;
   }
@@ -187,26 +142,30 @@ const App = () => {
         isOnline={isOnline}
         userPresence={userPresence}
         usersMap={usersMap}
+        setImpersonateUser={setImpersonateUser}   
       />
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        {activeSection === "chat" && (
-          <ChatRoom
-            currentUser={currentUser}
-            isOnline={isOnline}
-            messages={messages}
-            usersMap={usersMap}
-          />
-        )}
-        {activeSection === "games" && (
-          <GamesSection
-            gameStates={gameStates}
-            updateGameState={updateGameState}
-            isOnline={isOnline}
-          />
-        )}
-        {activeSection === "creative" && <CreativeZone />}
-      </main>
+  {activeSection === "chat" && (
+    <ChatRoom
+      currentUser={currentUser}
+      isOnline={isOnline}
+      messages={messages}
+      usersMap={usersMap}
+    />
+  )}
+
+  {activeSection === "games" && (
+    <GamesSection
+      gameStates={gameStates}
+      updateGameState={updateGameState}
+      isOnline={isOnline}
+    />
+  )}
+
+  {activeSection === "creative" && <CreativeZone />}
+</main>
+
     </div>
   );
 };
