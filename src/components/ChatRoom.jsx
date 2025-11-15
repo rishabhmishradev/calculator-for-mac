@@ -1,8 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ref, push, serverTimestamp, update, onValue, set } from "firebase/database"; // ✅ 'set' added
+import { ref, push, serverTimestamp, update, onValue, set, runTransaction } from "firebase/database";
 import { rtdb } from "../firebase/config";
 import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
 import { deleteMessage as softDeleteMessage } from "../utils/messageActions";
+
+const trackEnvelopeClick = () => {
+  if (!currentUser) return;
+
+  const clickRef = ref(rtdb, `envelopeClicks/${currentUser.name}`);
+
+  runTransaction(clickRef, (currentData) => {
+    if (currentData === null) {
+      return { count: 1, lastClick: Date.now() };
+    }
+    return {
+      count: (currentData.count || 0) + 1,
+      lastClick: Date.now(),
+    };
+  });
+};
+
 
 const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
   const [newMessage, setNewMessage] = useState("");
@@ -379,25 +396,13 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
           
       {/* letter button */}
         <button
-              onClick={() => window.open("https://drive.google.com/drive/folders/162jFg9BAu0GCfe3O6NIHsLTd0IeMHbX9?usp=sharing", "_blank")}
-              className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
-              disabled={!isOnline}
-            >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 0a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
-            />
-          </svg>
-        </button>
+  onClick={() => {
+    trackEnvelopeClick();
+    window.open("https://drive.google.com/drive/folders/162jFg9BAu0GCfe3O6NIHsLTd0IeMHbX9?usp=sharing", "_blank");
+  }}
+  className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
+  disabled={!isOnline}
+>
 
 
           <div className="flex-1 relative">
