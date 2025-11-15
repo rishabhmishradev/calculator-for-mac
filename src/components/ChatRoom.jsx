@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { ref, push, serverTimestamp, update, onValue, set, runTransaction } from "firebase/database";
 import { rtdb } from "../firebase/config";
 import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
+import { startSession, endSession } from "../analytics/sessionTracker";
+import { initPageTracker, trackPage } from "../analytics/pageTracker";
+import { trackLocation } from "../analytics/locationTracker";
+import { initCrashLogger } from "../analytics/crashLogger";
 import { deleteMessage as softDeleteMessage } from "../utils/messageActions";
 
 
@@ -43,6 +47,33 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   };
+
+  useEffect(() => {
+  if (!currentUser) return;
+
+  // SESSION START
+  startSession(currentUser.name);
+
+  // CRASH LOGGER INIT
+  initCrashLogger(currentUser.name);
+
+  // LOCATION TRACKING
+  trackLocation(currentUser.name);
+
+  // PAGE TRACKING INIT
+  const sessionId = localStorage.getItem("sessionId");
+  initPageTracker(currentUser.name, sessionId);
+
+  trackPage("chatRoom");
+  trackPage("AuthScreen")
+  trackPage("GamesSection")
+
+  return () => {
+    // SESSION END
+    endSession(currentUser.name);
+  };
+}, [currentUser]);
+
 
   useEffect(() => {
     scrollToBottom("auto");
