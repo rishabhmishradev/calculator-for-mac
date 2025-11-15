@@ -395,14 +395,35 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
 
           
       {/* letter button */}
-        <button
+        {/* letter button */}
+<button
   onClick={() => {
     trackEnvelopeClick();
-    window.open("https://drive.google.com/drive/folders/162jFg9BAu0GCfe3O6NIHsLTd0IeMHbX9?usp=sharing", "_blank");
+    window.open(
+      "https://drive.google.com/drive/folders/162jFg9BAu0GCfe3O6NIHsLTd0IeMHbX9?usp=sharing",
+      "_blank"
+    );
   }}
   className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors border border-zinc-700"
   disabled={!isOnline}
 >
+  {/* Envelope Icon */}
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-5 h-5 text-blue-400"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 0a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"
+    />
+  </svg>
+</button>
+
 
 
           <div className="flex-1 relative">
