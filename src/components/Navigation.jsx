@@ -28,15 +28,25 @@ const Navigation = ({ currentUser, setCurrentUser, setActiveSection, activeSecti
     return () => unsubscribe();
   }, [currentUser]);
 
+  // ✅ UPDATED LOGOUT FUNCTION
   const handleLogout = () => {
     if (currentUser?.name) {
+      // Update user status
       const userRef = ref(rtdb, `users/${currentUser.name}`);
       set(userRef, {
         name: currentUser.name,
         isOnline: false,
         lastSeen: Date.now(),
       });
+      
+      // ✅ CLEAR TYPING STATUS
+      const typingRef = ref(rtdb, `typing/${currentUser.name}`);
+      set(typingRef, {
+        isTyping: false,
+        timestamp: Date.now(),
+      }).catch((err) => console.error("Error clearing typing on logout:", err));
     }
+    
     localStorage.removeItem("chatUser");
     setCurrentUser(null);
     setActiveSection("chat");
