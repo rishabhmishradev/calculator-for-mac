@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ref, push, serverTimestamp, update, onValue, set, runTransaction } from "firebase/database";
 import { rtdb } from "../firebase/config";
-import { Send, MessageCircle, Smile, Check, CheckCheck } from "lucide-react";
+import { Send, MessageCircle, Smile, Check, CheckCheck, LogOut } from "lucide-react";
 import { startSession, endSession } from "../analytics/sessionTracker";
 import { initPageTracker, trackPage } from "../analytics/pageTracker";
 import { trackLocation } from "../analytics/locationTracker";
@@ -9,22 +9,22 @@ import { initCrashLogger } from "../analytics/crashLogger";
 import { deleteMessage as softDeleteMessage } from "../utils/messageActions";
 
 
-const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
+const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {}, setCurrentUser }) => {
   const trackEnvelopeClick = () => {
-  if (!currentUser) return;
+    if (!currentUser) return;
 
-  const clickRef = ref(rtdb, `envelopeClicks/${currentUser.name}`);
+    const clickRef = ref(rtdb, `envelopeClicks/${currentUser.name}`);
 
-  runTransaction(clickRef, (currentData) => {
-    if (currentData === null) {
-      return { count: 1, lastClick: Date.now() };
-    }
-    return {
-      count: (currentData.count || 0) + 1,
-      lastClick: Date.now(),
-    };
-  });
-};
+    runTransaction(clickRef, (currentData) => {
+      if (currentData === null) {
+        return { count: 1, lastClick: Date.now() };
+      }
+      return {
+        count: (currentData.count || 0) + 1,
+        lastClick: Date.now(),
+      };
+    });
+  };
 
   const [newMessage, setNewMessage] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -49,30 +49,30 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
   };
 
   useEffect(() => {
-  if (!currentUser) return;
+    if (!currentUser) return;
 
-  // SESSION START
-  startSession(currentUser.name);
+    // SESSION START
+    startSession(currentUser.name);
 
-  // CRASH LOGGER INIT
-  initCrashLogger(currentUser.name);
+    // CRASH LOGGER INIT
+    initCrashLogger(currentUser.name);
 
-  // LOCATION TRACKING
-  trackLocation(currentUser.name);
+    // LOCATION TRACKING
+    trackLocation(currentUser.name);
 
-  // PAGE TRACKING INIT
-  const sessionId = localStorage.getItem("sessionId");
-  initPageTracker(currentUser.name, sessionId);
+    // PAGE TRACKING INIT
+    const sessionId = localStorage.getItem("sessionId");
+    initPageTracker(currentUser.name, sessionId);
 
-  trackPage("chatRoom");
-  trackPage("AuthScreen")
-  trackPage("GamesSection")
+    trackPage("chatRoom");
+    trackPage("AuthScreen")
+    trackPage("GamesSection")
 
-  return () => {
-    // SESSION END
-    endSession(currentUser.name);
-  };
-}, [currentUser]);
+    return () => {
+      // SESSION END
+      endSession(currentUser.name);
+    };
+  }, [currentUser]);
 
 
   useEffect(() => {
@@ -297,6 +297,29 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
     return (now - typingTime) <= 5000;
   });
 
+  // ✅ LOGOUT FUNCTION
+  const handleLogout = () => {
+    if (currentUser?.name) {
+      // Update user status
+      const userRef = ref(rtdb, `users/${currentUser.name}`);
+      set(userRef, {
+        name: currentUser.name,
+        isOnline: false,
+        lastSeen: Date.now(),
+      });
+      
+      // Clear typing status
+      const typingRef = ref(rtdb, `typing/${currentUser.name}`);
+      set(typingRef, {
+        isTyping: false,
+        timestamp: Date.now(),
+      }).catch((err) => console.error("Error clearing typing on logout:", err));
+    }
+    
+    localStorage.removeItem("chatUser");
+    setCurrentUser(null);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-black">
       {/* Header */}
@@ -316,6 +339,15 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {} }) => {
                 : ""}
             </span>
           </div>
+          
+          {/* ✅ LOGOUT BUTTON */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1 bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          >
+            <LogOut size={14} />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
