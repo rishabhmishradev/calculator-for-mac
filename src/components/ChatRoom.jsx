@@ -74,6 +74,20 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {}, setCurrentUs
     };
   }, [currentUser]);
 
+  // ✅ NEW: Listen for force logout from Firebase
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const logoutRef = ref(rtdb, "forceLogout");
+    const unsubscribe = onValue(logoutRef, (snapshot) => {
+      if (snapshot.val() === true) {
+        alert("You have been logged out by admin!");
+        handleLogout();
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [currentUser]);
 
   useEffect(() => {
     scrollToBottom("auto");
@@ -323,33 +337,33 @@ const ChatRoom = ({ currentUser, isOnline, messages, usersMap = {}, setCurrentUs
   return (
     <div className="flex flex-col h-screen bg-black">
       {/* Header - ✅ FIXED */}
-<div className="sticky top-0 z-50 px-4 py-2 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-md text-zinc-200">
-  <div className="flex items-center justify-between">
-    <div className="flex flex-col">
-      <span className="text-sm font-semibold">
-        {otherUserPresence?.name || "Chat"}
-      </span>
-      <span className="text-xs text-zinc-400">
-        {someoneIsTyping
-          ? "typing..."
-          : otherUserPresence?.isOnline
-          ? "Online"
-          : otherUserPresence?.lastSeen
-          ? `Last seen ${new Date(otherUserPresence.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-          : ""}
-      </span>
-    </div>
-    
-    {/* ✅ LOGOUT BUTTON */}
-    <button
-      onClick={handleLogout}
-      className="flex items-center gap-1 bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md"
-    >
-      <LogOut size={14} />
-      <span>Logout</span>
-    </button>
-  </div>
-</div>
+      <div className="sticky top-0 z-50 px-4 py-2 border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-md text-zinc-200">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold">
+              {otherUserPresence?.name || "Chat"}
+            </span>
+            <span className="text-xs text-zinc-400">
+              {someoneIsTyping
+                ? "typing..."
+                : otherUserPresence?.isOnline
+                ? "Online"
+                : otherUserPresence?.lastSeen
+                ? `Last seen ${new Date(otherUserPresence.lastSeen).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                : ""}
+            </span>
+          </div>
+          
+          {/* ✅ LOGOUT BUTTON */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1 bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-all shadow-md"
+          >
+            <LogOut size={14} />
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
 
       {/* Messages */}
       <div
