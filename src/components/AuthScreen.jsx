@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { ref, set, serverTimestamp } from "firebase/database";
 import { rtdb } from "../firebase/config";
 import { Lock, Wifi, WifiOff } from "lucide-react";
+import { initNotifications } from "../hooks/useNotifications";
+
 
 const AuthScreen = ({ setCurrentUser, isOnline }) => {
   const [name, setName] = useState("");
@@ -9,31 +11,32 @@ const AuthScreen = ({ setCurrentUser, isOnline }) => {
   const [error, setError] = useState("");
 
   const handleLogin = () => {
-    const validUsers = {
-      boy: "1234",
-      Saman: "hello",
-    };
-
-    if (validUsers[name] === passcode) {
-      const userObj = { name, id: name };
-      setCurrentUser(userObj);
-
-      // ✅ Save in LocalStorage
-      localStorage.setItem("chatUser", JSON.stringify(userObj));
-
-      setError("");
-
-      // Firebase user update
-      const userRef = ref(rtdb, `users/${name}`);
-      set(userRef, {
-        name,
-        lastSeen: Date.now(),
-        isOnline: true,
-      });
-    } else {
-      setError("Invalid credentials.");
-    }
+  const validUsers = {
+    boy: "1234",
+    Saman: "hello",
   };
+
+  if (validUsers[name] === passcode) {
+    const userObj = { name, id: name };
+    setCurrentUser(userObj);
+
+    localStorage.setItem("chatUser", JSON.stringify(userObj));
+    setError("");
+
+    const userRef = ref(rtdb, `users/${name}`);
+    set(userRef, {
+      name,
+      lastSeen: Date.now(),
+      isOnline: true,
+    });
+
+    // 🔔 VERY IMPORTANT
+    initNotifications(name);
+  } else {
+    setError("Invalid credentials.");
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center p-4">

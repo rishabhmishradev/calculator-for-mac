@@ -1,77 +1,40 @@
-import { useEffect, useState } from 'react';
-import { requestNotificationPermission, onMessageListener } from '../firebase/config';
+import { getToken, onMessage } from "firebase/messaging";
+import { messaging } from "../firebase/config";
+import { rtdb } from "../firebase/config";
+import { ref, set } from "firebase/database";
 
-export const useNotifications = (currentUser) => {
-  const [notificationToken, setNotificationToken] = useState(null);
+const VAPID_KEY =
+  "BBQ93jERORO4fsQpJyScu2wH7MNzCaq3tY6NwN9tv_lRbw_w3_YDUgspftwzAhNf80QP8QOWRC7TPdWYQiCYs";
 
-  // Play notification sound
-  const playNotificationSound = () => {
-    const audio = new Audio('/notification.mp3');
-    audio.volume = 0.7;
-    audio.play().catch(err => console.log('Sound play error:', err));
-  };
-
-  // Show browser notification with sound
-  const showNotification = (title, body, sender) => {
-    if (Notification.permission === 'granted') {
-      const notification = new Notification(title, {
-        body,
-        icon: '/penguin.png',
-        badge: '/penguin.png',
-        tag: 'message-notification',
-        requireInteraction: false,
-        silent: false,
-        vibrate: [200, 100, 200],
-        data: { sender }
-      });
-
-      // Play sound
-      playNotificationSound();
-
-      notification.onclick = () => {
-        window.focus();
-        notification.close();
-      };
-
-      // Auto close after 5 seconds
-      setTimeout(() => notification.close(), 5000);
+export const initNotifications = async (userName) => {
+  try {
+    if (!messaging) {
+      console.warn("Messaging not supported");
+      return;
     }
-  };
 
-  // Initialize notifications
-  useEffect(() => {
-    if (!currentUser) return;
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return;
 
-    const initNotifications = async () => {
-      // Request permission and get token
-      const token = await requestNotificationPermission();
-      if (token) {
-        setNotificationToken(token);
-        console.log('FCM Token registered:', token);
-        
-        // Save token to database (optional)
-        // You can save this to Firebase Database or Firestore
-      }
-    };
+    const token = await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+    });
 
-    initNotifications();
-
-    // Listen for foreground messages
-    onMessageListener()
-      .then((payload) => {
-        console.log('Foreground message received:', payload);
-        
-        const title = payload.notification?.title || 'New Message';
-        const body = payload.notification?.body || 'You have a new message';
-        const sender = payload.data?.sender || 'Unknown';
-
-        // Show notification only if sender is not current user
-        if (sender !== currentUser.name) {
-          showNotification(title, body, sender);
-        }
-      })
-      .catch((err) => console.log('Failed to receive message:', err));
-  }, [currentUser]);
-
-  return { notificationToken, showNotification };
+    if (token) {
+      await set(ref(rtdb, `fcmTokens/${userName}`), token);
+      console.log("✅ FCM token saved:", token);
+    }
+  } catch (err) {
+    console.error("❌ FCM error", err);
+  }
 };
+
+// ✅ Foreground notification
+if (messaging) {
+  onMessage(messaging, (payload) => {
+    new Notification(payload.notification?.title || "New message", {
+      body: payload.notification?.body,
+      icon: "/icon-512.png",
+    });
+  });
+}
